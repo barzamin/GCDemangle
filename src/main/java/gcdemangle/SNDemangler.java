@@ -13,39 +13,12 @@ import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Library;
 import java.io.FileNotFoundException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 public class SNDemangler implements Demangler {	
-	static final int DEMANGLE_OPT_PARAMS =   1;
-	static final int DEMANGLE_OPT_ANSI   =   2;
-	static final int DEMANGLE_OPT_JAVA   =   4;
-	static final int DEMANGLE_OPT_AUTO   =   8;
-	static final int DEMANGLE_OPT_GNU    =  16;
-	static final int DEMANGLE_OPT_LUCID  =  32;
-	static final int DEMANGLE_OPT_ARM    =  64;
-	static final int DEMANGLE_OPT_HP     = 128;
-	static final int DEMANGLE_OPT_EDG    = 256;
-
-	public interface SNDemanglerLib extends Library {
-		Pointer mangle(String opname, int options);
-		Pointer demangle(String mangled, int options);
-		void free(Pointer str);
-	}
-	
-	SNDemanglerLib _demanglerLib;
-	SNDemanglerLib getDemanglerLib() throws DemangledException {
-		if (_demanglerLib == null) {
-			String libname = "sndemangle.so"; // todo dll
-			try {
-				_demanglerLib = Native.load(
-					Application.getOSFile(libname).getAbsolutePath(),
-					SNDemanglerLib.class);
-			} catch (FileNotFoundException e) {
-				throw new DemangledException("can't load " + libname);
-			}		
-		}
-		
-		return _demanglerLib;
-	}
+	static final Map<String, String> specialOpTable = initSpecialOpTable();
 	
 	@Override
 	public boolean canDemangle(Program program) {
@@ -63,44 +36,90 @@ public class SNDemangler implements Demangler {
 
 	@Override
 	public DemangledObject demangle(String mangled, DemanglerOptions options) throws DemangledException {
-		SNDemanglerLib dmngl = getDemanglerLib();
-
-		int opts = DEMANGLE_OPT_PARAMS
-		        | DEMANGLE_OPT_ANSI
-		        | DEMANGLE_OPT_AUTO
-		        | DEMANGLE_OPT_GNU
-		        | DEMANGLE_OPT_LUCID
-		        | DEMANGLE_OPT_ARM
-		        | DEMANGLE_OPT_HP
-		        | DEMANGLE_OPT_EDG;
-		Pointer demangled_ptr = dmngl.demangle(mangled, opts);
-		String demangled = demangled_ptr.getString(0);
-		dmngl.free(demangled_ptr);
-
-		if (demangled.equals(mangled) || demangled.length() == 0)
-			throw new DemangledException(true);
-		
-		DemangledObject demangledObject = parse(mangled, demangled, options.demangleOnlyKnownPatterns());
-
-		return demangledObject;
-
-//		if (demangledObject == null)
-//			return demangledObject;
-
-//		return null;
+		return null;
 	}
-	
-	private DemangledObject parse(String mangled, String demangled, boolean demangleOnlyKnownPatterns) {
-		if (demangleOnlyKnownPatterns && !isKnownMangledString(mangled, demangled)) {
-			return null;
-		}
 
-		GnuDemanglerParser parser = new GnuDemanglerParser();
-		DemangledObject demangledObject = parser.parse(mangled, demangled);
-		return demangledObject;
-	}
-	
-	private boolean isKnownMangledString(String mangled, String demangled) {
-		return true; // lmfao
+	private static Map<String, String> initSpecialOpTable() {
+		var map = new HashMap<String, String>();
+		map.put("nw", "operator new"); // DEMANGLE_OPT_ANSI, new (1.92,	 ansi)
+		map.put("dl", "operator delete"); // DEMANGLE_OPT_ANSI, new (1.92,	 ansi)
+		map.put("new", "operator new"); // 0, old (1.91,	 and 1.x)
+		map.put("delete", "operator delete"); // 0, old (1.91,	 and 1.x)
+		map.put("vn", "operator new []"); // DEMANGLE_OPT_ANSI, GNU, pending ansi
+		map.put("vd", "operator delete []"); // DEMANGLE_OPT_ANSI, GNU, pending ansi
+		map.put("as", "operator ="); // DEMANGLE_OPT_ANSI, ansi
+		map.put("ne", "operator !="); // DEMANGLE_OPT_ANSI, old, ansi
+		map.put("eq", "operator =="); // DEMANGLE_OPT_ANSI, old,	ansi
+		map.put("ge", "operator >="); // DEMANGLE_OPT_ANSI, old,	ansi
+		map.put("gt", "operator >"); // DEMANGLE_OPT_ANSI, old,	ansi
+		map.put("le", "operator <="); // DEMANGLE_OPT_ANSI, old,	ansi
+		map.put("lt", "operator <"); // DEMANGLE_OPT_ANSI, old,	ansi
+		map.put("plus", "operator +"); // 0, old
+		map.put("pl", "operator +"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("apl", "operator +="); // DEMANGLE_OPT_ANSI, ansi
+		map.put("minus", "operator -"); // 0, old
+		map.put("mi", "operator -"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("ami", "operator -="); // DEMANGLE_OPT_ANSI, ansi
+		map.put("mult", "operator *"); // 0, old
+		map.put("ml", "operator *"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("amu", "operator *="); // DEMANGLE_OPT_ANSI, ansi (ARM/Lucid)
+		map.put("aml", "operator *="); // DEMANGLE_OPT_ANSI, ansi (GNU/g++)
+		map.put("convert", "operator +"); // 0, old (unary +)
+		map.put("negate", "operator -"); // 0, old (unary -)
+		map.put("trunc_mod", "operator %"); // 0, old
+		map.put("md", "operator %"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("amd", "operator %="); // DEMANGLE_OPT_ANSI, ansi
+		map.put("trunc_div", "operator /"); // 0, old
+		map.put("dv", "operator /"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("adv", "operator /="); // DEMANGLE_OPT_ANSI, ansi
+		map.put("truth_andif", "operator &&"); // 0, old
+		map.put("aa", "operator &&"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("truth_orif", "operator ||"); // 0, old
+		map.put("oo", "operator ||"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("truth_not", "operator !"); // 0, old
+		map.put("nt", "operator !"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("postincrement", "operator ++"); // 0, old
+		map.put("pp", "operator ++"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("postdecrement", "operator --"); // 0, old
+		map.put("mm", "operator --"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("bit_ior", "operator |"); // 0, old
+		map.put("or", "operator |"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("aor", "operator |="); // DEMANGLE_OPT_ANSI, ansi
+		map.put("bit_xor", "operator ^"); // 0, old
+		map.put("er", "operator ^"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("aer", "operator ^="); // DEMANGLE_OPT_ANSI, ansi
+		map.put("bit_and", "operator &"); // 0, old
+		map.put("ad", "operator &"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("aad", "operator &="); // DEMANGLE_OPT_ANSI, ansi
+		map.put("bit_not", "operator ~"); // 0, old
+		map.put("co", "operator ~"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("call", "operator ()"); // 0, old
+		map.put("cl", "operator ()"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("alshift", "operator <<"); // 0, old
+		map.put("ls", "operator <<"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("als", "operator <<="); // DEMANGLE_OPT_ANSI, ansi
+		map.put("arshift", "operator >>"); // 0, old
+		map.put("rs", "operator >>"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("ars", "operator >>="); // DEMANGLE_OPT_ANSI, ansi
+		map.put("component", "operator ->"); // 0, old
+		map.put("pt", "operator ->"); // DEMANGLE_OPT_ANSI, ansi; Lucid C++ form
+		map.put("rf", "operator ->"); // DEMANGLE_OPT_ANSI, ansi; ARM/GNU form
+		map.put("indirect", "operator *"); // 0, old
+		map.put("method_call", "operator ->()"); // 0, old
+		map.put("addr", "operator &"); // 0, old (unary &)
+		map.put("array", "operator []"); // 0, old
+		map.put("vc", "operator []"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("compound", "operator ,"); // 0, old
+		map.put("cm", "operator ,"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("cond", "operator ?:"); // 0, old
+		map.put("cn", "operator ?:"); // DEMANGLE_OPT_ANSI, pseudo-ansi
+		map.put("max", "operator >?"); // 0, old
+		map.put("mx", "operator >?"); // DEMANGLE_OPT_ANSI, pseudo-ansi
+		map.put("min", "operator <?"); // 0, old
+		map.put("mn", "operator <?"); // DEMANGLE_OPT_ANSI, pseudo-ansi
+		map.put("rm", "operator ->*"); // DEMANGLE_OPT_ANSI, ansi
+		map.put("sz", "operator sizeof"); // DEMANGLE_OPT_ANSI, pseudo-ansi
+
+		return Collections.unmodifiableMap(map);
 	}
 }
