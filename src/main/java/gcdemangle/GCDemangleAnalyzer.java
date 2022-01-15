@@ -1,7 +1,4 @@
-/* ###
- * IP: GHIDRA
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
+/* Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * 
@@ -32,25 +29,25 @@ import ghidra.util.task.TaskMonitor;
  * Demangle gcc2 ProDG C++ symbols
  */
 public class GCDemangleAnalyzer extends AbstractDemanglerAnalyzer {
-	private SNDemangler demangler = new SNDemangler();
-	
-	public GCDemangleAnalyzer() {
-		super("Demangle SN/ProDG", "Demangle gcc2 ProDG C++ symbols");
-		setDefaultEnablement(true);
-	}
+    private SNDemangler demangler = new SNDemangler();
+    
+    public GCDemangleAnalyzer() {
+        super("Demangle SN/ProDG", "Demangle gcc2 ProDG C++ symbols");
+        setDefaultEnablement(true);
+    }
 
-	@Override
-	public boolean canAnalyze(Program program) {
-		return true;
-	}
+    @Override
+    public boolean canAnalyze(Program program) {
+        return true;
+    }
 
-	@Override
-	public void registerOptions(Options options, Program program) {
-	}
+    @Override
+    public void registerOptions(Options options, Program program) {
+    }
 
-	@Override
-	protected DemangledObject doDemangle(String mangled, DemanglerOptions options, MessageLog log)
-			throws DemangledException {
-		return demangler.demangle(mangled, options);
-	}
+    @Override
+    protected DemangledObject doDemangle(String mangled, DemanglerOptions options, MessageLog log)
+            throws DemangledException {
+        return demangler.demangle(mangled, options);
+    }
 }
