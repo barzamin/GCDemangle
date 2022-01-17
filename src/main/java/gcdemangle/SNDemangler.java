@@ -34,8 +34,23 @@ public class SNDemangler implements Demangler {
         return this.demangle(mangled, options);
     }
 
+    private boolean shouldDemangle(String symbol) {
+    	// must have a dunderscore in it
+    	if (!symbol.contains("__"))
+    		return false;
+
+    	// but can't start w it
+    	if (symbol.indexOf("__", 1) < 0)
+    		return false;
+
+    	return true;
+    }
+
     @Override
     public DemangledObject demangle(String mangled, DemanglerOptions options) throws DemangledException {
+        if (!shouldDemangle(mangled))
+        	return null;
+
         return null;
     }
 
