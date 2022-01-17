@@ -39,10 +39,6 @@ public class SNDemangler implements Demangler {
     	if (!symbol.contains("__"))
     		return false;
 
-    	// but can't start w it
-    	if (symbol.indexOf("__", 1) < 0)
-    		return false;
-
     	return true;
     }
 
